@@ -146,6 +146,10 @@ public class WireMock {
     defaultInstance.get().removeStubMapping(stubMapping);
   }
 
+  public static void removeStub(UUID id) {
+    defaultInstance.get().removeStubMapping(id);
+  }
+
   public static ListStubMappingsResult listAllStubMappings() {
     return defaultInstance.get().allStubMappings();
   }
@@ -250,7 +254,12 @@ public class WireMock {
   }
 
   public static EqualToXmlPattern equalToXml(String value, boolean enablePlaceholders) {
-    return new EqualToXmlPattern(value, enablePlaceholders, null, null, null);
+    return new EqualToXmlPattern(value, enablePlaceholders, null, null, null, false);
+  }
+
+  public static EqualToXmlPattern equalToXml(
+      String value, boolean enablePlaceholders, boolean ignoreOrderOfSameNode) {
+    return new EqualToXmlPattern(value, enablePlaceholders, ignoreOrderOfSameNode);
   }
 
   public static EqualToXmlPattern equalToXml(
@@ -263,7 +272,23 @@ public class WireMock {
         enablePlaceholders,
         placeholderOpeningDelimiterRegex,
         placeholderClosingDelimiterRegex,
-        null);
+        null,
+        false);
+  }
+
+  public static EqualToXmlPattern equalToXml(
+      String value,
+      boolean enablePlaceholders,
+      String placeholderOpeningDelimiterRegex,
+      String placeholderClosingDelimiterRegex,
+      boolean ignoreOrderOfSameNode) {
+    return new EqualToXmlPattern(
+        value,
+        enablePlaceholders,
+        placeholderOpeningDelimiterRegex,
+        placeholderClosingDelimiterRegex,
+        null,
+        ignoreOrderOfSameNode);
   }
 
   public static MatchesXPathPattern matchingXPath(String value) {
@@ -456,6 +481,10 @@ public class WireMock {
 
   public void removeStubMapping(StubMapping stubMapping) {
     admin.removeStubMapping(stubMapping);
+  }
+
+  public void removeStubMapping(UUID id) {
+    admin.removeStubMapping(id);
   }
 
   public ListStubMappingsResult allStubMappings() {

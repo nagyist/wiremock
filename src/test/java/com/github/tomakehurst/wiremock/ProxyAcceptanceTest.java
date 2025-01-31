@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2023 Thomas Akehurst
+ * Copyright (C) 2011-2024 Thomas Akehurst
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,10 +50,12 @@ import org.apache.hc.client5.http.classic.methods.HttpHead;
 import org.apache.hc.client5.http.entity.GzipCompressingEntity;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.HttpEntity;
 import org.apache.hc.core5.http.io.entity.ByteArrayEntity;
 import org.apache.hc.core5.http.io.entity.StringEntity;
+import org.apache.hc.core5.util.VersionInfo;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -355,6 +357,49 @@ public class ProxyAcceptanceTest {
   }
 
   @Test
+  public void preservesUserAgentProxyHeaderWhenSpecified() {
+    init(wireMockConfig().preserveUserAgentProxyHeader(true));
+
+    target.register(
+        get(urlEqualTo("/preserve-user-agent-header")).willReturn(aResponse().withStatus(200)));
+    proxy.register(
+        get(urlEqualTo("/preserve-user-agent-header"))
+            .willReturn(aResponse().proxiedFrom(targetServiceBaseUrl)));
+
+    testClient.get("/preserve-user-agent-header", withHeader("User-Agent", "my-user-agent"));
+
+    proxy.verifyThat(
+        getRequestedFor(urlEqualTo("/preserve-user-agent-header"))
+            .withHeader("User-Agent", equalTo("my-user-agent")));
+    target.verifyThat(
+        getRequestedFor(urlEqualTo("/preserve-user-agent-header"))
+            .withHeader("User-Agent", equalTo("my-user-agent")));
+  }
+
+  @Test
+  public void usesHttpClientUserAgentProxyHeaderWhenPreserveUserAgentProxyHeaderNotSpecified() {
+    init(wireMockConfig());
+
+    target.register(
+        get(urlEqualTo("/preserve-user-agent-header")).willReturn(aResponse().withStatus(200)));
+    proxy.register(
+        get(urlEqualTo("/preserve-user-agent-header"))
+            .willReturn(aResponse().proxiedFrom(targetServiceBaseUrl)));
+
+    testClient.get("/preserve-user-agent-header", withHeader("User-Agent", "my-user-agent"));
+
+    proxy.verifyThat(
+        getRequestedFor(urlEqualTo("/preserve-user-agent-header"))
+            .withHeader("User-Agent", equalTo("my-user-agent")));
+    String softwareInfo =
+        VersionInfo.getSoftwareInfo(
+            "Apache-HttpClient", "org.apache.hc.client5", HttpClientBuilder.class);
+    target.verifyThat(
+        getRequestedFor(urlEqualTo("/preserve-user-agent-header"))
+            .withHeader("User-Agent", equalTo(softwareInfo)));
+  }
+
+  @Test
   public void proxiesPatchRequestsWithBody() {
     initWithDefaultConfig();
 
@@ -421,7 +466,9 @@ public class ProxyAcceptanceTest {
     testClient.get("/duplicate/connection-header");
     LoggedRequest lastRequest =
         getLast(target.find(getRequestedFor(urlEqualTo("/duplicate/connection-header"))));
-    assertThat(lastRequest.getHeaders().getHeader("Connection").values().size(), is(1));
+    assertThat(
+        lastRequest.getHeaders().getHeader("Connection").values(),
+        hasItem("keep-alive"));
   }
 
   @Test

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2023 Thomas Akehurst
+ * Copyright (C) 2017-2024 Thomas Akehurst
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,12 +20,10 @@ import static com.github.tomakehurst.wiremock.testsupport.ExtensionFactoryUtils.
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 
-import com.github.jknack.handlebars.Context;
-import com.github.jknack.handlebars.Helper;
-import com.github.jknack.handlebars.Options;
+import com.github.jknack.handlebars.*;
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder;
+import com.github.tomakehurst.wiremock.common.RequestCache;
 import com.github.tomakehurst.wiremock.extension.ResponseDefinitionTransformerV2;
-import com.github.tomakehurst.wiremock.extension.responsetemplating.RenderCache;
 import com.github.tomakehurst.wiremock.extension.responsetemplating.ResponseTemplateTransformer;
 import com.github.tomakehurst.wiremock.http.Request;
 import com.github.tomakehurst.wiremock.http.ResponseDefinition;
@@ -40,12 +38,12 @@ import org.junit.jupiter.api.BeforeEach;
 public abstract class HandlebarsHelperTestBase {
 
   protected ResponseTemplateTransformer transformer;
-  protected RenderCache renderCache;
+  protected RequestCache requestCache;
 
   @BeforeEach
-  public void initRenderCache() {
+  public void initRequestCache() {
     transformer = buildTemplateTransformer(true);
-    renderCache = new RenderCache();
+    requestCache = new RequestCache();
   }
 
   protected static final String FAIL_GRACEFULLY_MSG =
@@ -66,6 +64,18 @@ public abstract class HandlebarsHelperTestBase {
     return (R) helper.apply(content, createOptions(parameters));
   }
 
+  @SuppressWarnings("unchecked")
+  protected <R, C> R renderHelperValue(
+      Helper<C> helper, C value, Map<String, Object> keyValueOptions, Object... parameters)
+      throws IOException {
+    final Options options =
+        new Options.Builder(null, null, TagType.VAR, createContext(), Template.EMPTY)
+            .setParams(new Object[] {value})
+            .setHash(keyValueOptions)
+            .build();
+    return (R) helper.apply(value, options);
+  }
+
   protected <T> void testHelper(Helper<T> helper, T content, String optionParam, String expected)
       throws IOException {
     testHelper(helper, content, optionParam, is(expected));
@@ -82,23 +92,23 @@ public abstract class HandlebarsHelperTestBase {
   }
 
   protected Options createOptions(Map<String, Object> hash, Object... optionParams) {
-    return createOptions(renderCache, hash, optionParams);
+    return createOptions(requestCache, hash, optionParams);
   }
 
   protected Options createOptions(
-      RenderCache renderCache, Map<String, Object> hash, Object... optionParams) {
-    Context context = createContext(renderCache);
+      RequestCache requestCache, Map<String, Object> hash, Object... optionParams) {
+    Context context = createContext(requestCache);
 
     return new Options(
         null, null, null, context, null, null, optionParams, hash, new ArrayList<String>(0));
   }
 
   protected Context createContext() {
-    return createContext(renderCache);
+    return createContext(requestCache);
   }
 
-  private Context createContext(RenderCache renderCache) {
-    return Context.newBuilder(null).combine("renderCache", renderCache).build();
+  private Context createContext(RequestCache requestCache) {
+    return Context.newBuilder(null).combine("requestCache", requestCache).build();
   }
 
   protected static Map<String, Object> map() {

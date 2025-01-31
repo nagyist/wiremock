@@ -15,7 +15,6 @@
  */
 package com.github.tomakehurst.wiremock.extension;
 
-import static com.github.tomakehurst.wiremock.common.LocalNotifier.notifier;
 import static java.util.Arrays.asList;
 
 import java.util.*;
@@ -27,6 +26,7 @@ public class ExtensionDeclarations {
   private final List<String> classNames;
   private final List<Class<? extends Extension>> classes;
   private final Map<String, Extension> instances;
+  private final List<Class<? extends ExtensionFactory>> factoryClasses;
   private final List<ExtensionFactory> factories;
   private static final String WEBHOOK_MESSAGE =
       "Passing webhooks in extensions is no longer required and"
@@ -36,6 +36,7 @@ public class ExtensionDeclarations {
     this.classNames = new ArrayList<>();
     this.classes = new ArrayList<>();
     this.instances = new LinkedHashMap<>();
+    this.factoryClasses = new ArrayList<>();
     this.factories = new ArrayList<>();
   }
 
@@ -59,6 +60,10 @@ public class ExtensionDeclarations {
     this.factories.addAll(asList(factories));
   }
 
+  public void addFactories(Class<? extends ExtensionFactory>... factoryClasses) {
+    this.factoryClasses.addAll(asList(factoryClasses));
+  }
+
   public List<String> getClassNames() {
     return classNames;
   }
@@ -75,9 +80,13 @@ public class ExtensionDeclarations {
     return factories;
   }
 
+  public List<Class<? extends ExtensionFactory>> getFactoryClasses() {
+    return factoryClasses;
+  }
+
   private boolean removeWebhook(String className) {
     if (className.equals(Webhooks.class.getName())) {
-      notifier().info(WEBHOOK_MESSAGE);
+      System.out.println(WEBHOOK_MESSAGE);
       return false;
     }
     return true;

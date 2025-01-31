@@ -18,10 +18,10 @@ package com.github.tomakehurst.wiremock.http;
 import static com.github.tomakehurst.wiremock.common.Exceptions.throwUnchecked;
 import static com.github.tomakehurst.wiremock.common.LocalNotifier.notifier;
 import static com.github.tomakehurst.wiremock.common.ProxySettings.NO_PROXY;
+import static com.github.tomakehurst.wiremock.common.Strings.isNotEmpty;
 import static com.github.tomakehurst.wiremock.common.ssl.KeyStoreSettings.NO_STORE;
 import static com.github.tomakehurst.wiremock.http.RequestMethod.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.commons.lang3.StringUtils.isEmpty;
 
 import com.github.tomakehurst.wiremock.common.NetworkAddressRules;
 import com.github.tomakehurst.wiremock.common.ProxySettings;
@@ -42,7 +42,6 @@ import org.apache.hc.client5.http.impl.auth.BasicCredentialsProvider;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.client5.http.impl.io.ManagedHttpClientConnectionFactory;
-import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
 import org.apache.hc.client5.http.socket.LayeredConnectionSocketFactory;
 import org.apache.hc.client5.http.ssl.NoopHostnameVerifier;
@@ -79,19 +78,10 @@ public class HttpClientFactory {
             .disableCookieManagement()
             .disableRedirectHandling()
             .disableContentCompression()
-            .setConnectionManager(
-                PoolingHttpClientConnectionManagerBuilder.create()
-                    .setDnsResolver(dnsResolver)
-                    .setMaxConnPerRoute(maxConnections)
-                    .setMaxConnTotal(maxConnections)
-                    .setValidateAfterInactivity(TimeValue.ofSeconds(5)) // TODO Verify duration
-                    .setConnectionFactory(
-                        new ManagedHttpClientConnectionFactory(
-                            null, CharCodingConfig.custom().setCharset(UTF_8).build(), null))
-                    .build())
             .setDefaultRequestConfig(
                 RequestConfig.custom()
                     .setResponseTimeout(Timeout.ofMilliseconds(timeoutMilliseconds))
+                    .setProtocolUpgradeEnabled(false)
                     .build());
 
     if (disableConnectionReuse) {
@@ -107,7 +97,7 @@ public class HttpClientFactory {
     if (proxySettings != NO_PROXY) {
       HttpHost proxyHost = new HttpHost(proxySettings.host(), proxySettings.port());
       builder.setProxy(proxyHost);
-      if (!isEmpty(proxySettings.getUsername()) && !isEmpty(proxySettings.getPassword())) {
+      if (isNotEmpty(proxySettings.getUsername()) && isNotEmpty(proxySettings.getPassword())) {
         builder.setProxyAuthenticationStrategy(new DefaultAuthenticationStrategy()); // TODO Verify
         BasicCredentialsProvider credentialsProvider = new BasicCredentialsProvider();
         credentialsProvider.setCredentials(
@@ -121,12 +111,17 @@ public class HttpClientFactory {
     final SSLContext sslContext =
         buildSslContext(trustStoreSettings, trustAllCertificates, trustedHosts);
     LayeredConnectionSocketFactory sslSocketFactory = buildSslConnectionSocketFactory(sslContext);
-    PoolingHttpClientConnectionManager connectionManager =
+    builder.setConnectionManager(
         PoolingHttpClientConnectionManagerBuilder.create()
             .setSSLSocketFactory(sslSocketFactory)
             .setDnsResolver(dnsResolver)
-            .build();
-    builder.setConnectionManager(connectionManager);
+            .setMaxConnPerRoute(maxConnections)
+            .setMaxConnTotal(maxConnections)
+            .setValidateAfterInactivity(TimeValue.ofSeconds(5)) // TODO Verify duration
+            .setConnectionFactory(
+                new ManagedHttpClientConnectionFactory(
+                    null, CharCodingConfig.custom().setCharset(UTF_8).build(), null))
+            .build());
 
     return builder.build();
   }
@@ -144,10 +139,6 @@ public class HttpClientFactory {
         );
   }
 
-  /**
-   * Copied from {@link HttpClientBuilder#split(String)} which is not the same as {@link
-   * org.apache.commons.lang3.StringUtils#split(String)}
-   */
   private static String[] split(final String s) {
     if (TextUtils.isBlank(s)) {
       return null;

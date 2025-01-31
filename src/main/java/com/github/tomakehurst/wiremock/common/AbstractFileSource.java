@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2023 Thomas Akehurst
+ * Copyright (C) 2012-2024 Thomas Akehurst
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
  */
 package com.github.tomakehurst.wiremock.common;
 
+import static com.github.tomakehurst.wiremock.common.Exceptions.throwUnchecked;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.github.tomakehurst.wiremock.security.NotAuthorisedException;
@@ -54,10 +55,13 @@ public abstract class AbstractFileSource implements FileSource {
 
   @Override
   public void createIfNecessary() {
-    assertWritable();
+    if (rootDirectory.isDirectory()) {
+      return;
+    }
+
     if (rootDirectory.exists() && rootDirectory.isFile()) {
       throw new IllegalStateException(rootDirectory + " already exists and is a file");
-    } else if (!rootDirectory.exists()) {
+    } else if (!rootDirectory.exists() && !readOnly()) {
       rootDirectory.mkdirs();
     }
   }
@@ -97,11 +101,12 @@ public abstract class AbstractFileSource implements FileSource {
 
   @Override
   public void writeTextFile(String name, String contents) {
-    writeTextFileAndTranslateExceptions(contents, writableFileFor(name));
+    writeBinaryFile(name, contents.getBytes(UTF_8));
   }
 
   @Override
   public void writeBinaryFile(String name, byte[] contents) {
+    createIfNecessary();
     writeBinaryFileAndTranslateExceptions(contents, writableFileFor(name));
   }
 
@@ -157,27 +162,12 @@ public abstract class AbstractFileSource implements FileSource {
         throw new NotAuthorisedException(
             "Access to file "
                 + path
-                + " is not permitted. An absolute path from the filesystem root might be specified");
+                + " is not permitted. An absolute path from the filesystem root might be specified. "
+                + "Your file must be in "
+                + rootDirectory.getAbsolutePath());
       }
     } catch (IOException ioe) {
       throw new NotAuthorisedException("File " + path + " cannot be accessed", ioe);
-    }
-  }
-
-  private void ensureDirectoryExists(File toFile) throws IOException {
-    Path toPath = toFile.toPath();
-    if (!java.nio.file.Files.exists(toPath)) {
-      Path toParentPath = toPath.getParent();
-      java.nio.file.Files.createDirectories(toParentPath);
-    }
-  }
-
-  private void writeTextFileAndTranslateExceptions(String contents, File toFile) {
-    try {
-      ensureDirectoryExists(toFile);
-      Files.write(toFile.toPath(), contents.getBytes(UTF_8));
-    } catch (IOException ioe) {
-      throw new RuntimeException(ioe);
     }
   }
 
@@ -186,7 +176,15 @@ public abstract class AbstractFileSource implements FileSource {
       ensureDirectoryExists(toFile);
       Files.write(toFile.toPath(), contents);
     } catch (IOException ioe) {
-      throw new RuntimeException(ioe);
+      throwUnchecked(ioe);
+    }
+  }
+
+  private void ensureDirectoryExists(File toFile) throws IOException {
+    Path toPath = toFile.toPath();
+    if (!java.nio.file.Files.exists(toPath)) {
+      Path toParentPath = toPath.getParent();
+      java.nio.file.Files.createDirectories(toParentPath);
     }
   }
 
