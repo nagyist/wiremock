@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018-2023 Thomas Akehurst
+ * Copyright (C) 2018-2024 Thomas Akehurst
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,9 @@
 package com.github.tomakehurst.wiremock;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
+import static com.github.tomakehurst.wiremock.common.Strings.randomAlphanumeric;
 import static com.github.tomakehurst.wiremock.testsupport.MultipartBody.part;
 import static java.util.Collections.singletonList;
-import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
 import static org.apache.hc.core5.http.ContentType.MULTIPART_FORM_DATA;
 import static org.apache.hc.core5.http.ContentType.TEXT_PLAIN;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -26,14 +26,17 @@ import static org.hamcrest.Matchers.is;
 
 import com.github.tomakehurst.wiremock.http.HttpClientFactory;
 import com.github.tomakehurst.wiremock.testsupport.WireMockResponse;
-import org.apache.hc.client5.http.entity.mime.MultipartEntityBuilder;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.UUID;
+import org.apache.hc.client5.http.entity.mime.*;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.core5.http.ClassicHttpRequest;
-import org.apache.hc.core5.http.ClassicHttpResponse;
-import org.apache.hc.core5.http.HttpResponse;
+import org.apache.hc.core5.http.*;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
+import org.apache.hc.core5.http.message.BasicNameValuePair;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -84,7 +87,9 @@ public class MultipartBodyMatchingAcceptanceTest extends AcceptanceTestBase {
     assertThat(response.getCode(), is(404));
   }
 
-  /** @see <a href="https://github.com/tomakehurst/wiremock/issues/1047">#1047</a> */
+  /**
+   * @see <a href="https://github.com/tomakehurst/wiremock/issues/1047">#1047</a>
+   */
   @Test
   public void acceptsAMultipartMixedRequestContainingATextAndAFilePart() throws Exception {
     stubFor(
@@ -109,7 +114,9 @@ public class MultipartBodyMatchingAcceptanceTest extends AcceptanceTestBase {
     assertThat(EntityUtils.toString(response.getEntity()), response.getCode(), is(200));
   }
 
-  /** @see <a href="https://github.com/tomakehurst/wiremock/issues/1047">#1047</a> */
+  /**
+   * @see <a href="https://github.com/tomakehurst/wiremock/issues/1047">#1047</a>
+   */
   @Test
   public void acceptsAMultipartRelatedRequestContainingATextAndAFilePart() throws Exception {
     stubFor(
@@ -166,5 +173,139 @@ public class MultipartBodyMatchingAcceptanceTest extends AcceptanceTestBase {
             "/multipart", singletonList(part("vlarge", randomAlphanumeric(300000), TEXT_PLAIN)));
 
     assertThat(response.statusCode(), is(200));
+  }
+
+  @Test
+  void acceptsAMultipartRequestWithCamelcasedContentTypeInformation() throws Exception {
+    stubFor(
+        post("/multipart-camelcased-content-type")
+            .withMultipartRequestBody(aMultipart().withName("field1").withBody(containing("hello")))
+            .withMultipartRequestBody(aMultipart().withName("field2").withBody(containing("world")))
+            .willReturn(ok()));
+
+    final URL url = new URL(wireMockServer.baseUrl() + "/multipart-camelcased-content-type");
+
+    final String boundary = "uuid:" + UUID.randomUUID();
+
+    // Test without leading Spaces
+    HttpURLConnection connection = prepareUrlConnectionForCamelcasedContentTypeInformation(url);
+    connection.setRequestProperty(
+        "Content-Type", "Multipart/Form-Data; boundary=\"" + boundary + "\"");
+    try (final OutputStream contentStream = connection.getOutputStream()) {
+      contentStream.write(getRequestBodyForCamelcasedContentTypeInformationWithBoundary(boundary));
+    }
+    assertThat(connection.getResponseCode(), is(200));
+  }
+
+  private HttpURLConnection prepareUrlConnectionForCamelcasedContentTypeInformation(URL url)
+      throws Exception {
+    final HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+    connection.setDoInput(true);
+    connection.setDoOutput(true);
+    connection.setUseCaches(false);
+    connection.setRequestMethod("POST");
+    connection.setRequestProperty("Accept", "*/*");
+    return connection;
+  }
+
+  private byte[] getRequestBodyForCamelcasedContentTypeInformationWithBoundary(String boundary) {
+    return ("--"
+            + boundary
+            + "\r\n"
+            + "Content-Disposition: form-data; name=\"field1\"\r\n"
+            + "\r\n"
+            + "hello\r\n"
+            + "--"
+            + boundary
+            + "\r\n"
+            + "Content-Disposition: form-data; name=\"field2\"\r\n"
+            + "\r\n"
+            + "world\r\n"
+            + "--"
+            + boundary
+            + "--")
+        .getBytes();
+  }
+
+  @Test
+  void acceptsAMultipartRequestWithCamelcasedContentTypeInformationPrefixedWithSpaces()
+      throws Exception {
+    stubFor(
+        post("/multipart-camelcased-content-type")
+            .withMultipartRequestBody(aMultipart().withName("field1").withBody(containing("hello")))
+            .withMultipartRequestBody(aMultipart().withName("field2").withBody(containing("world")))
+            .willReturn(ok()));
+
+    final URL url = new URL(wireMockServer.baseUrl() + "/multipart-camelcased-content-type");
+
+    final String boundary = "uuid:" + UUID.randomUUID();
+
+    // Test without leading Spaces
+    HttpURLConnection connection = prepareUrlConnectionForCamelcasedContentTypeInformation(url);
+    connection.setRequestProperty(
+        "Content-Type", "    Multipart/Form-Data; boundary=\"" + boundary + "\"");
+    try (final OutputStream contentStream = connection.getOutputStream()) {
+      contentStream.write(getRequestBodyForCamelcasedContentTypeInformationWithBoundary(boundary));
+    }
+    assertThat(connection.getResponseCode(), is(200));
+  }
+
+  @Test
+  void acceptsAMultipartRelatedSOAPWithAttachmentRequest() throws Exception {
+    final String soapBody =
+        "<soap:Envelope xmlns:soap=\"http://www.w3.org/2003/05/soap-envelope\">\n"
+            + "  <soap:Header></soap:Header>\n"
+            + "  <soap:Body>\n"
+            + "    <ns1:Test xmlns:ns1=\"http://www.test.org/some-test-namespace\">\n"
+            + "      <ns1:Attachment>\n"
+            + "        <xop:Include xmlns:xop=\"http://www.w3.org/2004/08/xop/include\" href=\"ref-to-attachment%40some.domain.org\"/>\n"
+            + "      </ns1:Attachment>\n"
+            + "    </ns1:Test>\n"
+            + "  </soap:Body>\n"
+            + "</soap:Envelope>";
+
+    stubFor(
+        post("/multipart-related")
+            .withMultipartRequestBody(
+                aMultipart()
+                    .withHeader(
+                        "content-type",
+                        equalTo("application/xop+xml; type=\"application/soap+xml\""))
+                    .withBody(equalTo(soapBody)))
+            .withMultipartRequestBody(
+                aMultipart()
+                    .withHeader("content-type", equalTo("text/plain"))
+                    .withHeader("content-id", equalTo("<ref-to-attachment@some.domain.org>"))
+                    .withBody(equalTo("some text/plain content")))
+            .willReturn(ok()));
+
+    final ClassicHttpRequest request =
+        ClassicRequestBuilder.post(wireMockServer.baseUrl() + "/multipart-related")
+            .setEntity(
+                MultipartEntityBuilder.create()
+                    .setMimeSubtype("related")
+                    .addPart(
+                        MultipartPartBuilder.create()
+                            .setBody(
+                                new StringBody(
+                                    soapBody,
+                                    ContentType.create("application/xop+xml")
+                                        .withParameters(
+                                            new BasicNameValuePair(
+                                                "type", "application/soap+xml"))))
+                            .build())
+                    .addPart(
+                        MultipartPartBuilder.create()
+                            .setHeader("content-id", "<ref-to-attachment@some.domain.org>")
+                            .setBody(
+                                new StringBody(
+                                    "some text/plain content", ContentType.create("text/plain")))
+                            .build())
+                    .build())
+            .build();
+
+    ClassicHttpResponse response = httpClient.execute(request);
+
+    assertThat(response.getCode(), is(200));
   }
 }

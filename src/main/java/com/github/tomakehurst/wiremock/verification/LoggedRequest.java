@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2023 Thomas Akehurst
+ * Copyright (C) 2011-2024 Thomas Akehurst
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package com.github.tomakehurst.wiremock.verification;
 
 import static com.github.tomakehurst.wiremock.common.Encoding.decodeBase64;
 import static com.github.tomakehurst.wiremock.common.Encoding.encodeBase64;
+import static com.github.tomakehurst.wiremock.common.Lazy.lazy;
 import static com.github.tomakehurst.wiremock.common.ParameterUtils.getFirstNonNull;
 import static com.github.tomakehurst.wiremock.common.Strings.stringFromBytes;
 import static com.github.tomakehurst.wiremock.common.Urls.safelyCreateURL;
@@ -26,7 +27,9 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import com.fasterxml.jackson.annotation.*;
 import com.github.tomakehurst.wiremock.common.Dates;
 import com.github.tomakehurst.wiremock.common.Json;
+import com.github.tomakehurst.wiremock.common.Lazy;
 import com.github.tomakehurst.wiremock.common.Urls;
+import com.github.tomakehurst.wiremock.common.url.PathParams;
 import com.github.tomakehurst.wiremock.http.*;
 import java.net.URL;
 import java.nio.charset.Charset;
@@ -35,6 +38,7 @@ import java.util.*;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class LoggedRequest implements Request {
 
+  private final UUID id;
   private final String scheme;
   private final String host;
   private final int port;
@@ -43,6 +47,7 @@ public class LoggedRequest implements Request {
   private final String clientIp;
   private final RequestMethod method;
   private final HttpHeaders headers;
+  private final PathParams pathParams;
   private final Map<String, Cookie> cookies;
   private final Map<String, QueryParameter> queryParams;
   private final Map<String, FormParameter> formParameters;
@@ -52,8 +57,12 @@ public class LoggedRequest implements Request {
   private final Collection<Part> multiparts;
   private final String protocol;
 
+  private final Lazy<String> lazyBodyAsString;
+  private final Lazy<String> lazyBodyAsBase64;
+
   public static LoggedRequest createFrom(Request request) {
     return new LoggedRequest(
+        request.getId(),
         request.getScheme(),
         request.getHost(),
         request.getPort(),
@@ -62,6 +71,7 @@ public class LoggedRequest implements Request {
         request.getMethod(),
         request.getClientIp(),
         request.getHeaders(),
+        request.getPathParameters(),
         request.getCookies(),
         request.isBrowserProxyRequest(),
         new Date(),
@@ -89,11 +99,13 @@ public class LoggedRequest implements Request {
         null,
         null,
         null,
+        null,
         url,
         absoluteUrl,
         method,
         clientIp,
         headers,
+        PathParams.empty(),
         cookies,
         isBrowserProxyRequest,
         loggedDate,
@@ -104,6 +116,7 @@ public class LoggedRequest implements Request {
   }
 
   private LoggedRequest(
+      UUID id,
       String scheme,
       String host,
       Integer port,
@@ -112,6 +125,7 @@ public class LoggedRequest implements Request {
       RequestMethod method,
       String clientIp,
       HttpHeaders headers,
+      PathParams pathParams,
       Map<String, Cookie> cookies,
       boolean isBrowserProxyRequest,
       Date loggedDate,
@@ -119,6 +133,7 @@ public class LoggedRequest implements Request {
       Collection<Part> multiparts,
       String protocol,
       Map<String, FormParameter> formParameters) {
+    this.id = id;
     this.url = url;
 
     this.absoluteUrl = absoluteUrl;
@@ -137,6 +152,7 @@ public class LoggedRequest implements Request {
     this.method = method;
     this.body = body;
     this.headers = headers;
+    this.pathParams = pathParams;
     this.cookies = cookies;
     this.queryParams = url != null ? splitQueryFromUrl(url) : Collections.emptyMap();
     this.formParameters = formParameters;
@@ -144,6 +160,14 @@ public class LoggedRequest implements Request {
     this.loggedDate = loggedDate;
     this.multiparts = multiparts;
     this.protocol = protocol;
+
+    lazyBodyAsString = lazy(() -> stringFromBytes(body, encodingFromContentTypeHeaderOrUtf8()));
+    lazyBodyAsBase64 = lazy(() -> encodeBase64(body));
+  }
+
+  @Override
+  public UUID getId() {
+    return id;
   }
 
   @Override
@@ -218,6 +242,12 @@ public class LoggedRequest implements Request {
     return getHeader(key) != null;
   }
 
+  @JsonIgnore
+  @Override
+  public PathParams getPathParameters() {
+    return pathParams;
+  }
+
   @Override
   public Map<String, Cookie> getCookies() {
     return cookies;
@@ -231,13 +261,13 @@ public class LoggedRequest implements Request {
   @Override
   @JsonProperty("body")
   public String getBodyAsString() {
-    return stringFromBytes(body, encodingFromContentTypeHeaderOrUtf8());
+    return lazyBodyAsString.get();
   }
 
   @Override
   @JsonProperty("bodyAsBase64")
   public String getBodyAsBase64() {
-    return encodeBase64(body);
+    return lazyBodyAsBase64.get();
   }
 
   @Override

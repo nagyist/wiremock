@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 Thomas Akehurst
+ * Copyright (C) 2023-2024 Thomas Akehurst
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,28 +15,29 @@
  */
 package com.github.tomakehurst.wiremock.extension.responsetemplating;
 
+import static com.github.tomakehurst.wiremock.common.Strings.isNotEmpty;
+
 import com.github.tomakehurst.wiremock.common.Urls;
-import com.github.tomakehurst.wiremock.common.url.PathTemplate;
+import com.github.tomakehurst.wiremock.common.url.PathParams;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
-import org.apache.commons.lang3.StringUtils;
 
 public class TemplatedUrlPath extends LinkedHashMap<String, String> implements Iterable<String> {
 
   private final String originalPath;
 
-  public TemplatedUrlPath(String url, PathTemplate pathTemplate) {
+  public TemplatedUrlPath(String url, PathParams pathParams) {
     this.originalPath = Urls.getPath(url);
     addAllPathSegments();
-    putAll(pathTemplate.parse(originalPath));
+    putAll(pathParams);
   }
 
   private void addAllPathSegments() {
     final List<String> pathSegments = Urls.getPathSegments(originalPath);
     int i = 0;
     for (String pathNode : pathSegments) {
-      if (StringUtils.isNotEmpty(pathNode)) {
+      if (isNotEmpty(pathNode)) {
         String key = String.valueOf(i++);
         put(key, pathNode);
       }

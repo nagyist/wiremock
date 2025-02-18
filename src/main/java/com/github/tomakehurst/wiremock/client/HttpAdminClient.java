@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2023 Thomas Akehurst
+ * Copyright (C) 2011-2024 Thomas Akehurst
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,8 +17,10 @@ package com.github.tomakehurst.wiremock.client;
 
 import static com.github.tomakehurst.wiremock.common.Exceptions.throwUnchecked;
 import static com.github.tomakehurst.wiremock.common.HttpClientUtils.getEntityAsStringAndCloseStream;
+import static com.github.tomakehurst.wiremock.common.Strings.isNotBlank;
 import static com.github.tomakehurst.wiremock.security.NoClientAuthenticator.noClientAuthenticator;
 import static java.util.Objects.requireNonNull;
+import static org.apache.hc.core5.http.HttpHeaders.CONTENT_TYPE;
 import static org.apache.hc.core5.http.HttpHeaders.HOST;
 
 import com.github.tomakehurst.wiremock.admin.*;
@@ -49,7 +51,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.classic.methods.HttpPut;
@@ -438,7 +439,7 @@ public class HttpAdminClient implements Admin {
   }
 
   private ProxySettings createProxySettings(String proxyHost, int proxyPort) {
-    if (StringUtils.isNotBlank(proxyHost)) {
+    if (isNotBlank(proxyHost)) {
       return new ProxySettings(proxyHost, proxyPort);
     }
     return ProxySettings.NO_PROXY;
@@ -446,12 +447,14 @@ public class HttpAdminClient implements Admin {
 
   private String postJsonAssertOkAndReturnBody(String url, String json) {
     HttpPost post = new HttpPost(url);
+    post.addHeader(CONTENT_TYPE, "application/json");
     post.setEntity(jsonStringEntity(Optional.ofNullable(json).orElse("")));
     return safelyExecuteRequest(url, post);
   }
 
   private String putJsonAssertOkAndReturnBody(String url, String json) {
     HttpPut put = new HttpPut(url);
+    put.addHeader(CONTENT_TYPE, "application/json");
     put.setEntity(jsonStringEntity(Optional.ofNullable(json).orElse("")));
     return safelyExecuteRequest(url, put);
   }
@@ -502,6 +505,7 @@ public class HttpAdminClient implements Admin {
     if (requestSpec.method().hasEntity()) {
       requestBuilder.setEntity(
           jsonStringEntity(Optional.ofNullable(requestBody).map(Json::write).orElse("")));
+      requestBuilder.addHeader(CONTENT_TYPE, "application/json");
     }
 
     String responseBodyString = safelyExecuteRequest(url, requestBuilder.build());
@@ -524,13 +528,16 @@ public class HttpAdminClient implements Admin {
 
   private void verifyResponseStatus(String url, int responseStatusCode) {
     if (HttpStatus.isServerError(responseStatusCode)) {
-      throw new VerificationException(
-          "Expected status 2xx for " + url + " but was " + responseStatusCode);
+      throw new VerificationException(responseStatusErrorMessage(url, responseStatusCode));
     }
 
     if (responseStatusCode == 401) {
-      throw new NotAuthorisedException();
+      throw new NotAuthorisedException(responseStatusErrorMessage(url, responseStatusCode));
     }
+  }
+
+  private String responseStatusErrorMessage(String url, int responseStatusCode) {
+    return "Expected status 2xx for " + url + " but was " + responseStatusCode;
   }
 
   private String safelyExecuteRequest(String url, ClassicHttpRequest request) {
@@ -543,14 +550,42 @@ public class HttpAdminClient implements Admin {
 
       String body = getEntityAsStringAndCloseStream(response);
       if (HttpStatus.isClientError(statusCode)) {
-        Errors errors = Json.read(body, Errors.class);
-        throw ClientError.fromErrors(errors);
+        throwParsedClientError(url, body, statusCode);
       }
 
       return body;
     } catch (Exception e) {
       return throwUnchecked(e, String.class);
     }
+  }
+
+  private void throwParsedClientError(String url, String responseBody, int responseStatusCode) {
+    Errors errors;
+    try {
+      errors = Json.read(responseBody, Errors.class);
+    } catch (JsonException e) {
+      Errors.Error jsonError = e.getErrors().first();
+      String jsonErrorDetail = jsonError.getDetail();
+      String extendedDetail =
+          new StringBuilder()
+              .append("Error parsing response body '")
+              .append(responseBody)
+              .append("' with status code ")
+              .append(responseStatusCode)
+              .append(" for ")
+              .append(url)
+              .append(". Error: ")
+              .append(jsonErrorDetail)
+              .toString();
+      errors =
+          Errors.single(
+              jsonError.getCode(),
+              jsonError.getSource().getPointer(),
+              jsonError.getTitle(),
+              extendedDetail);
+    }
+
+    throw ClientError.fromErrors(errors);
   }
 
   private String urlFor(Class<? extends AdminTask> taskClass) {

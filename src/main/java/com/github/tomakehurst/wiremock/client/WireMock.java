@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2024 Thomas Akehurst
+ * Copyright (C) 2011-2025 Thomas Akehurst
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -146,6 +146,10 @@ public class WireMock {
     defaultInstance.get().removeStubMapping(stubMapping);
   }
 
+  public static void removeStub(UUID id) {
+    defaultInstance.get().removeStubMapping(id);
+  }
+
   public static ListStubMappingsResult listAllStubMappings() {
     return defaultInstance.get().allStubMappings();
   }
@@ -249,8 +253,18 @@ public class WireMock {
     return new EqualToXmlPattern(value);
   }
 
+  public static EqualToXmlPattern equalToXml(
+      String value, EqualToXmlPattern.NamespaceAwareness namespaceAwareness) {
+    return new EqualToXmlPattern(value, null, null, null, null, null, namespaceAwareness);
+  }
+
   public static EqualToXmlPattern equalToXml(String value, boolean enablePlaceholders) {
-    return new EqualToXmlPattern(value, enablePlaceholders, null, null, null);
+    return equalToXml(value, enablePlaceholders, false);
+  }
+
+  public static EqualToXmlPattern equalToXml(
+      String value, boolean enablePlaceholders, boolean ignoreOrderOfSameNode) {
+    return new EqualToXmlPattern(value, enablePlaceholders, ignoreOrderOfSameNode);
   }
 
   public static EqualToXmlPattern equalToXml(
@@ -258,12 +272,44 @@ public class WireMock {
       boolean enablePlaceholders,
       String placeholderOpeningDelimiterRegex,
       String placeholderClosingDelimiterRegex) {
+    return equalToXml(
+        value,
+        enablePlaceholders,
+        placeholderOpeningDelimiterRegex,
+        placeholderClosingDelimiterRegex,
+        false);
+  }
+
+  public static EqualToXmlPattern equalToXml(
+      String value,
+      boolean enablePlaceholders,
+      String placeholderOpeningDelimiterRegex,
+      String placeholderClosingDelimiterRegex,
+      boolean ignoreOrderOfSameNode) {
+    return equalToXml(
+        value,
+        enablePlaceholders,
+        placeholderOpeningDelimiterRegex,
+        placeholderClosingDelimiterRegex,
+        ignoreOrderOfSameNode,
+        null);
+  }
+
+  public static EqualToXmlPattern equalToXml(
+      String value,
+      boolean enablePlaceholders,
+      String placeholderOpeningDelimiterRegex,
+      String placeholderClosingDelimiterRegex,
+      boolean ignoreOrderOfSameNode,
+      EqualToXmlPattern.NamespaceAwareness namespaceAwareness) {
     return new EqualToXmlPattern(
         value,
         enablePlaceholders,
         placeholderOpeningDelimiterRegex,
         placeholderClosingDelimiterRegex,
-        null);
+        null,
+        ignoreOrderOfSameNode,
+        namespaceAwareness);
   }
 
   public static MatchesXPathPattern matchingXPath(String value) {
@@ -456,6 +502,10 @@ public class WireMock {
 
   public void removeStubMapping(StubMapping stubMapping) {
     admin.removeStubMapping(stubMapping);
+  }
+
+  public void removeStubMapping(UUID id) {
+    admin.removeStubMapping(id);
   }
 
   public ListStubMappingsResult allStubMappings() {

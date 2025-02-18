@@ -16,27 +16,38 @@
 package com.github.tomakehurst.wiremock.matching;
 
 import static java.util.Arrays.asList;
-import static java.util.stream.Collectors.toUnmodifiableList;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.github.tomakehurst.wiremock.stubbing.SubEvent;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.stream.Collectors;
+import org.wiremock.annotations.Beta;
 
 public abstract class MatchResult implements Comparable<MatchResult> {
 
   private final Queue<SubEvent> subEvents;
+  private final List<DiffDescription> diffDescriptions;
 
   public MatchResult() {
-    this.subEvents = new LinkedBlockingQueue<>();
+    this(List.of(), List.of());
   }
 
   public MatchResult(List<SubEvent> subEvents) {
+    this(subEvents, List.of());
+  }
+
+  public MatchResult(List<SubEvent> subEvents, DiffDescription diffDescription) {
+    this(subEvents, List.of(diffDescription));
+  }
+
+  public MatchResult(List<SubEvent> subEvents, List<DiffDescription> diffDescriptions) {
     this.subEvents = new LinkedBlockingQueue<>(subEvents);
+    this.diffDescriptions = diffDescriptions;
   }
 
   protected void appendSubEvent(SubEvent subEvent) {
@@ -44,12 +55,24 @@ public abstract class MatchResult implements Comparable<MatchResult> {
   }
 
   public List<SubEvent> getSubEvents() {
-    return subEvents.stream().collect(toUnmodifiableList());
+    return new ArrayList<>(subEvents);
+  }
+
+  public List<DiffDescription> getDiffDescriptions() {
+    return this.diffDescriptions;
   }
 
   @JsonCreator
   public static MatchResult partialMatch(@JsonProperty("distance") double distance) {
-    return new EagerMatchResult(distance);
+    return partialMatch(distance, List.of());
+  }
+
+  public static MatchResult partialMatch(double distance, SubEvent... subEvents) {
+    return partialMatch(distance, List.of(subEvents));
+  }
+
+  public static MatchResult partialMatch(double distance, List<SubEvent> subEvents) {
+    return new EagerMatchResult(distance, subEvents);
   }
 
   public static MatchResult exactMatch(SubEvent... subEvents) {
@@ -105,4 +128,31 @@ public abstract class MatchResult implements Comparable<MatchResult> {
 
   public static final java.util.function.Predicate<WeightedMatchResult> ARE_EXACT_MATCH =
       WeightedMatchResult::isExactMatch;
+
+  @Beta(
+      justification =
+          "Add self-description callbacks for use in Diff - https://github.com/wiremock/wiremock/issues/2758")
+  public static class DiffDescription {
+    private final String expected;
+    private final String actual;
+    private final String errorMessage;
+
+    public DiffDescription(String expected, String actual, String errorMessage) {
+      this.expected = expected;
+      this.actual = actual;
+      this.errorMessage = errorMessage;
+    }
+
+    public String getExpected() {
+      return expected;
+    }
+
+    public String getErrorMessage() {
+      return errorMessage;
+    }
+
+    public String getActual() {
+      return actual;
+    }
+  }
 }

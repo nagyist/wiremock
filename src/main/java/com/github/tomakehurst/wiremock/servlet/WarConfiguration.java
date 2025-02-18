@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2023 Thomas Akehurst
+ * Copyright (C) 2016-2024 Thomas Akehurst
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,6 +58,16 @@ public class WarConfiguration implements Options {
 
   @Override
   public boolean getHttpDisabled() {
+    return false;
+  }
+
+  @Override
+  public boolean getHttp2PlainDisabled() {
+    return false;
+  }
+
+  @Override
+  public boolean getHttp2TlsDisabled() {
     return false;
   }
 
@@ -147,6 +157,11 @@ public class WarConfiguration implements Options {
   }
 
   @Override
+  public boolean shouldPreserveUserAgentProxyHeader() {
+    return false;
+  }
+
+  @Override
   public String proxyHostHeader() {
     return null;
   }
@@ -154,6 +169,11 @@ public class WarConfiguration implements Options {
   @Override
   public HttpServerFactory httpServerFactory() {
     return null;
+  }
+
+  @Override
+  public boolean hasDefaultHttpServerFactory() {
+    return false;
   }
 
   @Override
@@ -252,6 +272,16 @@ public class WarConfiguration implements Options {
   }
 
   @Override
+  public int getMaxHttpClientConnections() {
+    return DEFAULT_MAX_HTTP_CONNECTIONS;
+  }
+
+  @Override
+  public boolean getDisableConnectionReuse() {
+    return DEFAULT_DISABLE_CONNECTION_REUSE;
+  }
+
+  @Override
   public boolean getResponseTemplatingEnabled() {
     return true;
   }
@@ -274,5 +304,10 @@ public class WarConfiguration implements Options {
   @Override
   public boolean getTemplateEscapingDisabled() {
     return false;
+  }
+
+  @Override
+  public Set<String> getSupportedProxyEncodings() {
+    return null;
   }
 }

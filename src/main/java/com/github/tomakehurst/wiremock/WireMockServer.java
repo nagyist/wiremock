@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2023 Thomas Akehurst
+ * Copyright (C) 2011-2024 Thomas Akehurst
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,10 +29,7 @@ import com.github.tomakehurst.wiremock.core.Container;
 import com.github.tomakehurst.wiremock.core.Options;
 import com.github.tomakehurst.wiremock.core.WireMockApp;
 import com.github.tomakehurst.wiremock.global.GlobalSettings;
-import com.github.tomakehurst.wiremock.http.HttpServer;
-import com.github.tomakehurst.wiremock.http.HttpServerFactory;
-import com.github.tomakehurst.wiremock.http.RequestListener;
-import com.github.tomakehurst.wiremock.http.StubRequestHandler;
+import com.github.tomakehurst.wiremock.http.*;
 import com.github.tomakehurst.wiremock.junit.Stubbing;
 import com.github.tomakehurst.wiremock.matching.RequestPattern;
 import com.github.tomakehurst.wiremock.matching.RequestPatternBuilder;
@@ -72,16 +69,24 @@ public class WireMockServer implements Container, Stubbing, Admin {
 
     this.stubRequestHandler = wireMockApp.buildStubRequestHandler();
 
-    HttpServerFactory httpServerFactory =
-        wireMockApp.getExtensions().ofType(HttpServerFactory.class).values().stream()
-            .findFirst()
-            .orElseGet(options::httpServerFactory);
+    HttpServerFactory httpServerFactory = getHttpServerFactory();
 
     httpServer =
         httpServerFactory.buildHttpServer(
             options, wireMockApp.buildAdminRequestHandler(), stubRequestHandler);
 
+    notifier.info("Using HTTP server impl: " + httpServer.getClass().getSimpleName());
+
     client = new WireMock(wireMockApp);
+  }
+
+  private HttpServerFactory getHttpServerFactory() {
+    return new HttpServerFactoryLoader(
+            options,
+            wireMockApp.getExtensions(),
+            HttpServerFactoryLoader.systemServiceLoader(),
+            HttpServerFactoryLoader.isJetty11())
+        .load();
   }
 
   public WireMockServer(
@@ -257,6 +262,11 @@ public class WireMockServer implements Container, Stubbing, Admin {
   @Override
   public void removeStub(StubMapping stubMapping) {
     client.removeStubMapping(stubMapping);
+  }
+
+  @Override
+  public void removeStub(UUID id) {
+    client.removeStubMapping(id);
   }
 
   @Override

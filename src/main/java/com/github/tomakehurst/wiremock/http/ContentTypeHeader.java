@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2023 Thomas Akehurst
+ * Copyright (C) 2011-2024 Thomas Akehurst
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,8 @@
  */
 package com.github.tomakehurst.wiremock.http;
 
-import com.github.tomakehurst.wiremock.common.Strings;
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 import java.nio.charset.Charset;
 import java.util.Optional;
 
@@ -43,7 +44,7 @@ public class ContentTypeHeader extends HttpHeader {
   }
 
   public String mimeTypePart() {
-    return parts != null ? parts[0] : null;
+    return parts != null && parts.length > 0 ? parts[0] : null;
   }
 
   public Optional<String> encodingPart() {
@@ -61,6 +62,6 @@ public class ContentTypeHeader extends HttpHeader {
       return Charset.forName(encodingPart().get());
     }
 
-    return Strings.DEFAULT_CHARSET;
+    return UTF_8;
   }
 }

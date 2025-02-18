@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2023 Thomas Akehurst
+ * Copyright (C) 2017-2024 Thomas Akehurst
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,13 +32,14 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import com.github.tomakehurst.wiremock.extension.Parameters;
 import com.github.tomakehurst.wiremock.http.FormParameter;
 import com.github.tomakehurst.wiremock.http.Request;
+import com.github.tomakehurst.wiremock.matching.EagerMatchResult;
 import com.github.tomakehurst.wiremock.matching.MatchResult;
 import com.github.tomakehurst.wiremock.matching.RequestMatcherExtension;
-import java.util.Collections;
+import com.github.tomakehurst.wiremock.matching.WeightedAggregateMatchResult;
+import com.github.tomakehurst.wiremock.matching.WeightedMatchResult;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.SystemUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledForJreRange;
@@ -48,19 +49,22 @@ import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.JRE;
 import org.junit.jupiter.api.condition.OS;
 
-public class PlainTextDiffRendererTest {
+class PlainTextDiffRendererTest {
 
   PlainTextDiffRenderer diffRenderer;
 
   @BeforeEach
-  public void init() {
+  void init() {
     diffRenderer =
         new PlainTextDiffRenderer(
-            Collections.singletonMap("my-custom-matcher", new MyCustomMatcher()));
+            Map.of(
+                "my-custom-matcher", new MyCustomMatcher(),
+                "self-describing-custom-matcher", new SelfDescribingCustomMatcher(),
+                "weighted-self-describing-custom-matcher", new WeightedDescribingCustomMatcher()));
   }
 
   @Test
-  public void rendersWithDifferingUrlHeaderAndJsonBody() {
+  void rendersWithDifferingUrlHeaderAndJsonBody() {
     Diff diff =
         new Diff(
             post("/thing")
@@ -95,7 +99,7 @@ public class PlainTextDiffRendererTest {
   }
 
   @Test
-  public void rendersWithDifferingCookies() {
+  void rendersWithDifferingCookies() {
     Diff diff =
         new Diff(
             post("/thing")
@@ -116,7 +120,7 @@ public class PlainTextDiffRendererTest {
   }
 
   @Test
-  public void rendersWithDifferingQueryParameters() {
+  void rendersWithDifferingQueryParameters() {
     Diff diff =
         new Diff(
             get(urlPathEqualTo("/thing"))
@@ -134,7 +138,7 @@ public class PlainTextDiffRendererTest {
   }
 
   @Test
-  public void rendersWithDifferingFormParameters() {
+  void rendersWithDifferingFormParameters() {
     Diff diff =
         new Diff(
             put(urlPathEqualTo("/thing"))
@@ -164,7 +168,7 @@ public class PlainTextDiffRendererTest {
   }
 
   @Test
-  public void wrapsLargeJsonBodiesAppropriately() {
+  void wrapsLargeJsonBodiesAppropriately() {
     Diff diff =
         new Diff(
             post("/thing")
@@ -211,7 +215,7 @@ public class PlainTextDiffRendererTest {
 
     // Ugh. The joys of Microsoft's line ending innovations.
     String expected =
-        SystemUtils.IS_OS_WINDOWS
+        System.getProperty("os.name").startsWith("Windows")
             ? file("not-found-diff-sample_large_json_windows.txt")
             : file("not-found-diff-sample_large_json.txt");
 
@@ -223,7 +227,7 @@ public class PlainTextDiffRendererTest {
 
   @Test
   @DisabledForJreRange(min = JRE.JAVA_11, disabledReason = "Wrap differs per JRE")
-  public void wrapsLargeXmlBodiesAppropriatelyJre8() {
+  void wrapsLargeXmlBodiesAppropriatelyJre8() {
     String output = wrapsLargeXmlBodiesAppropriately();
     assertThat(output, equalsMultiLine(file("not-found-diff-sample_large_xml_jre8.txt")));
   }
@@ -231,7 +235,7 @@ public class PlainTextDiffRendererTest {
   @Test
   @EnabledForJreRange(min = JRE.JAVA_11, disabledReason = "Wrap differs per JRE")
   @DisabledOnOs(value = OS.WINDOWS, disabledReason = "Wrap differs per OS")
-  public void wrapsLargeXmlBodiesAppropriatelyJre11() {
+  void wrapsLargeXmlBodiesAppropriatelyJre11() {
     String output = wrapsLargeXmlBodiesAppropriately();
     assertThat(output, equalsMultiLine(file("not-found-diff-sample_large_xml_jre11.txt")));
   }
@@ -239,7 +243,7 @@ public class PlainTextDiffRendererTest {
   @Test
   @EnabledForJreRange(min = JRE.JAVA_11, disabledReason = "Wrap differs per JRE")
   @EnabledOnOs(value = OS.WINDOWS, disabledReason = "Wrap differs per OS")
-  public void wrapsLargeXmlBodiesAppropriatelyJre11Windows() {
+  void wrapsLargeXmlBodiesAppropriatelyJre11Windows() {
     String output = wrapsLargeXmlBodiesAppropriately();
 
     String expected = file("not-found-diff-sample_large_xml_jre11_windows.txt");
@@ -298,7 +302,7 @@ public class PlainTextDiffRendererTest {
   }
 
   @Test
-  public void showsMissingHeaderMessage() {
+  void showsMissingHeaderMessage() {
     Diff diff =
         new Diff(
             post("/thing")
@@ -314,7 +318,7 @@ public class PlainTextDiffRendererTest {
   }
 
   @Test
-  public void showsJsonPathMismatch() {
+  void showsJsonPathMismatch() {
     Diff diff =
         new Diff(
             post("/thing")
@@ -348,7 +352,7 @@ public class PlainTextDiffRendererTest {
   }
 
   @Test
-  public void showsXPathWithSubMatchMismatch() {
+  void showsXPathWithSubMatchMismatch() {
     Diff diff =
         new Diff(
             post("/thing").withRequestBody(matchingXPath("//thing/text()", equalTo("two"))).build(),
@@ -365,7 +369,7 @@ public class PlainTextDiffRendererTest {
   }
 
   @Test
-  public void showsUrlRegexUnescapedMessage() {
+  void showsUrlRegexUnescapedMessage() {
     Diff diff =
         new Diff(
             get(urlMatching("thing?query=value")).build(), mockRequest().method(GET).url("/thing"));
@@ -377,7 +381,7 @@ public class PlainTextDiffRendererTest {
   }
 
   @Test
-  public void showsUrlTemplateNonMatchMessage() {
+  void showsUrlTemplateNonMatchMessage() {
     Diff diff =
         new Diff(
             get(urlPathTemplate("/contacts/{contactId}")).build(),
@@ -390,7 +394,7 @@ public class PlainTextDiffRendererTest {
   }
 
   @Test
-  public void showsUrlPathParametersNonMatchMessage() {
+  void showsUrlPathParametersNonMatchMessage() {
     Diff diff =
         new Diff(
             get(urlPathTemplate("/contacts/{contactId}"))
@@ -405,7 +409,7 @@ public class PlainTextDiffRendererTest {
   }
 
   @Test
-  public void showsMultipartDifference() {
+  void showsMultipartDifference() {
     Diff diff =
         new Diff(
             post("/thing")
@@ -438,7 +442,7 @@ public class PlainTextDiffRendererTest {
   }
 
   @Test
-  public void showsErrorInDiffWhenMultipartExpectedButNotSent() {
+  void showsErrorInDiffWhenMultipartExpectedButNotSent() {
     Diff diff =
         new Diff(
             post("/thing")
@@ -457,7 +461,7 @@ public class PlainTextDiffRendererTest {
   }
 
   @Test
-  public void showsErrorInDiffWhenInlineCustomMatcherNotSatisfiedInMixedStub() {
+  void showsErrorInDiffWhenInlineCustomMatcherNotSatisfiedInMixedStub() {
     Diff diff =
         new Diff(
             post("/thing")
@@ -473,7 +477,7 @@ public class PlainTextDiffRendererTest {
   }
 
   @Test
-  public void showsErrorInDiffWhenNamedCustomMatcherNotSatisfiedInMixedStub() {
+  void showsErrorInDiffWhenNamedCustomMatcherNotSatisfiedInMixedStub() {
     Diff diff =
         new Diff(
             post("/thing")
@@ -490,7 +494,46 @@ public class PlainTextDiffRendererTest {
   }
 
   @Test
-  public void showsErrorInDiffWhenExactMatchForMultipleValuesInQueryParamNotSatisfiedInStub() {
+  void showsErrorInDiffWhenSelfDescribingNamedCustomMatcherNotSatisfiedInMixedStub() {
+    Diff diff =
+        new Diff(
+            post("/thing")
+                .withName("Standard and custom matched stub")
+                .andMatching("self-describing-custom-matcher", Parameters.one("myVal", "present"))
+                .build(),
+            mockRequest().method(POST).url("/thing"));
+
+    String output = diffRenderer.render(diff);
+    System.out.println(output);
+
+    assertThat(
+        output,
+        equalsMultiLine(
+            file("not-found-diff-sample_mixed-matchers-self-describing-named-custom.txt")));
+  }
+
+  @Test
+  void
+      showsErrorInDiffWhenWeightedSelfDescribingNamedCustomMatcherNotSatisfiedInMixedStubDoesNotShowCustomDiff() {
+    Diff diff =
+        new Diff(
+            post("/thing")
+                .withName("Standard and weighted custom matched stub")
+                .andMatching(
+                    "weighted-self-describing-custom-matcher", Parameters.one("myVal", "present"))
+                .build(),
+            mockRequest().method(POST).url("/thing"));
+
+    String output = diffRenderer.render(diff);
+    System.out.println(output);
+
+    assertThat(
+        output,
+        equalsMultiLine(file("not-found-diff-sample_mixed-matchers-weighted-named-custom.txt")));
+  }
+
+  @Test
+  void showsErrorInDiffWhenExactMatchForMultipleValuesInQueryParamNotSatisfiedInStub() {
     Diff diff =
         new Diff(
             get(urlPathEqualTo("/thing")).withQueryParam("q", havingExactly("1", "2", "3")).build(),
@@ -504,7 +547,7 @@ public class PlainTextDiffRendererTest {
   }
 
   @Test
-  public void showsErrorInDiffWhenIncludesMatchForMultipleValuesInQueryParamNotSatisfiedInStub() {
+  void showsErrorInDiffWhenIncludesMatchForMultipleValuesInQueryParamNotSatisfiedInStub() {
     Diff diff =
         new Diff(
             get(urlPathEqualTo("/thing")).withQueryParam("q", including("1", "2", "3")).build(),
@@ -518,7 +561,7 @@ public class PlainTextDiffRendererTest {
   }
 
   @Test
-  public void showsErrorInDiffWhenExactMatchForMultipleValuesInHeaderNotSatisfiedInStub() {
+  void showsErrorInDiffWhenExactMatchForMultipleValuesInHeaderNotSatisfiedInStub() {
     Diff diff =
         new Diff(
             get(urlPathEqualTo("/thing")).withHeader("q", havingExactly("1", "2", "3")).build(),
@@ -531,7 +574,7 @@ public class PlainTextDiffRendererTest {
   }
 
   @Test
-  public void showsErrorInDiffWhenIncludesMatchForMultipleValuesInHeaderNotSatisfiedInStub() {
+  void showsErrorInDiffWhenIncludesMatchForMultipleValuesInHeaderNotSatisfiedInStub() {
     Diff diff =
         new Diff(
             get(urlPathEqualTo("/thing")).withHeader("q", including("1", "2", "3")).build(),
@@ -544,7 +587,7 @@ public class PlainTextDiffRendererTest {
   }
 
   @Test
-  public void showsAppropriateErrorInDiffWhenCustomMatcherIsUsedExclusively() {
+  void showsAppropriateErrorInDiffWhenCustomMatcherIsUsedExclusively() {
     Diff diff =
         new Diff(
             requestMatching(value -> MatchResult.noMatch()).build(),
@@ -557,7 +600,7 @@ public class PlainTextDiffRendererTest {
   }
 
   @Test
-  public void handlesUrlsWithQueryStringAndNoPath() {
+  void handlesUrlsWithQueryStringAndNoPath() {
     Diff diff =
         new Diff(
             newRequestPattern(GET, urlMatching("/?q=correct")).build(),
@@ -565,6 +608,8 @@ public class PlainTextDiffRendererTest {
 
     String output = diffRenderer.render(diff);
     System.out.println(output);
+
+    assertThat(output, equalsMultiLine(file("not-found-diff-sample_no-path.txt")));
   }
 
   @Test
@@ -588,7 +633,7 @@ public class PlainTextDiffRendererTest {
   }
 
   @Test
-  public void showsErrorInDiffWhenBodyIsEmptyAndPathExpressionResult() {
+  void showsErrorInDiffWhenBodyIsEmptyAndPathExpressionResult() {
     Diff diff =
         new Diff(
             newRequestPattern(ANY, urlEqualTo("/thing"))
@@ -604,7 +649,7 @@ public class PlainTextDiffRendererTest {
   }
 
   @Test
-  public void showsErrorInDiffWhenBodyIsNotJsonAndPathExpressionResult() {
+  void showsErrorInDiffWhenBodyIsNotJsonAndPathExpressionResult() {
     Diff diff =
         new Diff(
             newRequestPattern(ANY, urlEqualTo("/thing"))
@@ -619,17 +664,82 @@ public class PlainTextDiffRendererTest {
         equalsMultiLine(file("not-found-diff-sample_json-path-body-not-json.txt")));
   }
 
+  @Test
+  void doesNotIncorrectlyShowUrlPathParametersNonMatchMessage() {
+    Diff diff =
+        new Diff(
+            get(urlPathTemplate("/contacts/{contactId}"))
+                .withPathParam("contactId", equalTo("123"))
+                .withHeader("Authorization", equalTo("Token 456"))
+                .build(),
+            mockRequest().method(GET).url("/contacts/123").header("Authorization", "Token 789"));
+
+    String output = diffRenderer.render(diff);
+
+    assertThat(
+        output, equalsMultiLine(file("not-found-diff-sample_no_path_parameter_message.txt")));
+  }
+
   public static class MyCustomMatcher extends RequestMatcherExtension {
 
     @Override
     public MatchResult match(Request request, Parameters parameters) {
-      parameters.getString("myVal"); // Ensure we're getting passed parameters as expcted
+      parameters.getString("myVal"); // Ensure we're getting passed parameters as expected
       return MatchResult.noMatch();
     }
 
     @Override
     public String getName() {
       return "my-custom-matcher";
+    }
+  }
+
+  public static class SelfDescribingCustomMatcher extends RequestMatcherExtension {
+
+    @Override
+    public MatchResult match(Request request, Parameters parameters) {
+      parameters.getString("myVal"); // Ensure we're getting passed parameters as expected
+      final MatchResult.DiffDescription diffDescription =
+          new MatchResult.DiffDescription(
+              "Property a: foo",
+              "Property a: bar",
+              "Not matched because of property a not matching");
+      final MatchResult.DiffDescription diffDescription2 =
+          new MatchResult.DiffDescription(
+              "Property b: foo",
+              "Property b: bar",
+              "Not matched because of property b not matching");
+      return new EagerMatchResult(1, List.of(), List.of(diffDescription, diffDescription2));
+    }
+
+    @Override
+    public String getName() {
+      return "self-describing-custom-matcher";
+    }
+  }
+
+  public static class WeightedDescribingCustomMatcher extends RequestMatcherExtension {
+
+    @Override
+    public MatchResult match(Request request, Parameters parameters) {
+      parameters.getString("myVal"); // Ensure we're getting passed parameters as expected
+      final MatchResult.DiffDescription diffDescription =
+          new MatchResult.DiffDescription("Expected x", "Found y", "Not matched due to x != y");
+      final MatchResult.DiffDescription diffDescription2 =
+          new MatchResult.DiffDescription("Expected a", "Found b", "Not matched due to a != b");
+      final MatchResult.DiffDescription diffDescription3 =
+          new MatchResult.DiffDescription("Expected c", "Found d", "Not matched due to c != d");
+      return new WeightedAggregateMatchResult(
+          List.of(
+              WeightedMatchResult.weight(
+                  new EagerMatchResult(1, List.of(), List.of(diffDescription, diffDescription2))),
+              WeightedMatchResult.weight(
+                  new EagerMatchResult(1, List.of(), List.of(diffDescription3)))));
+    }
+
+    @Override
+    public String getName() {
+      return "weighted-self-describing-custom-matcher";
     }
   }
 }
